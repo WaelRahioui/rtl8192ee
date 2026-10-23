@@ -1,5 +1,12 @@
 EXTRA_CFLAGS += $(USER_EXTRA_CFLAGS)
 EXTRA_CFLAGS += -O3 -mtune=native
+# Kernels >= 6.5 build with -fstrict-flex-arrays=3, which makes the many
+# trailing "[0]" arrays in this vendor code zero-sized for FORTIFY_SOURCE
+# (kernel BUG in __fortify_strlen at load). Keep the lenient semantics.
+EXTRA_CFLAGS += $(call cc-option,-fstrict-flex-arrays=0)
+# The same "[1]"-style arrays trip the kernel UBSAN bounds checker on every
+# access (harmless but floods dmesg with traces); do not instrument this module.
+UBSAN_SANITIZE := n
 #EXTRA_CFLAGS += -O3
 #EXTRA_CFLAGS += -Wall
 #EXTRA_CFLAGS += -Wextra
@@ -26,9 +33,12 @@ EXTRA_LDFLAGS += --strip-all -O3
 
 CONFIG_AUTOCFG_CP = n
 
-LEAP15_3 = $shell(cat /usr/lib/os-release | egrep "openSUSE Leap 15.3")
-
-EXTRA_CFLAGS += -DLEAP15_3
+# openSUSE Leap 15.3 ships a 5.3 kernel with 5.8+ cfg80211 APIs backported.
+ifneq ($(shell grep -c "openSUSE Leap 15.3" /usr/lib/os-release 2>/dev/null),0)
+EXTRA_CFLAGS += -DLEAP15_3=1
+else
+EXTRA_CFLAGS += -DLEAP15_3=0
+endif
  
 ########################## WIFI IC ############################
 CONFIG_MULTIDRV = n
